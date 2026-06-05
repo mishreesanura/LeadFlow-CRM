@@ -1,0 +1,17 @@
+export class AppError extends Error {
+  public readonly statusCode: number;
+  public readonly code: string;
+  public readonly details?: unknown;
+
+  constructor(statusCode: number, code: string, message: string, details?: unknown) {
+    super(message);
+    this.statusCode = statusCode;
+    this.code = code;
+    this.details = details;
+  }
+}
+
+export const notFound = (resource: string) =>
+  new AppError(404, "NOT_FOUND", `${resource} was not found.`);
+
+export const conflict = (message: string) => new AppError(409, "CONFLICT", message);
