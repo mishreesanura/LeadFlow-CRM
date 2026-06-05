@@ -51,30 +51,25 @@ export function PipelineBoard({ leads, onEdit, onSelect, onStatusChange }: Pipel
                 key={lead.id}
                 onDragStart={() => setDraggingId(lead.id)}
                 onDragEnd={() => setDraggingId(null)}
+                style={{ position: 'relative' }}
               >
-                <button type="button" onClick={() => onSelect(lead)}>
+                <button 
+                  type="button" 
+                  className="icon-button" 
+                  onClick={() => onEdit(lead)} 
+                  aria-label="Edit lead" 
+                  title="Edit"
+                  style={{ position: 'absolute', top: '8px', right: '8px', width: '28px', height: '28px' }}
+                >
+                  <Edit3 size={14} />
+                </button>
+                <button type="button" onClick={() => onSelect(lead)} style={{ paddingRight: '24px', textAlign: 'left' }}>
                   <strong>{lead.name}</strong>
                   <span style={{ color: 'var(--ink)', fontSize: '13px', fontWeight: '500', opacity: 0.8, display: 'block', marginTop: '4px' }}>{lead.company}</span>
                 </button>
-                <div className="pipeline-meta">
-                  <span>{currency.format(lead.estimatedValue)}</span>
-                  <span>{formatDate(lead.createdAt)}</span>
-                </div>
-                <div className="pipeline-actions">
-                  <button type="button" className="icon-button" onClick={() => onEdit(lead)} aria-label="Edit lead" title="Edit">
-                    <Edit3 size={14} />
-                  </button>
-                  <select
-                    value={lead.status}
-                    onChange={(event) => onStatusChange(lead, event.target.value as LeadStatus)}
-                    aria-label={`Move ${lead.name}`}
-                  >
-                    {leadStatuses.map((nextStatus) => (
-                      <option key={nextStatus} value={nextStatus}>
-                        {nextStatus}
-                      </option>
-                    ))}
-                  </select>
+                <div className="pipeline-meta" style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: '8px' }}>
+                  <span style={{ fontSize: '20px', fontWeight: '700', color: 'var(--primary)' }}>{currency.format(lead.estimatedValue)}</span>
+                  <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{formatDate(lead.createdAt)}</span>
                 </div>
               </article>
             ))}
