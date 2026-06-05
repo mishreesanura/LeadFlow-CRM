@@ -58,6 +58,8 @@ export function LeadDashboard() {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
+  const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
 
@@ -135,6 +137,63 @@ export function LeadDashboard() {
 
   const leads = leadsQuery.data?.data ?? [];
   const meta = leadsQuery.data?.meta;
+
+  const derivedNotifications = useMemo(() => {
+    if (!leads.length) return [];
+    
+    const now = new Date().getTime();
+    
+    const newLeads = [...leads]
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 5)
+      .map(lead => ({
+        id: `new-${lead.id}`,
+        title: 'New Lead Added',
+        message: `${lead.name} from ${lead.company} was added to the CRM.`,
+        time: new Date(lead.createdAt).getTime(),
+        unread: !readNotificationIds.includes(`new-${lead.id}`) && (now - new Date(lead.createdAt).getTime() < 24 * 60 * 60 * 1000)
+      }));
+
+    const statusUpdates = [...leads]
+      .filter(lead => lead.status !== 'New')
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+      .slice(0, 5)
+      .map(lead => ({
+        id: `status-${lead.id}`,
+        title: `Lead ${lead.status}`,
+        message: `${lead.name}'s status was updated to ${lead.status}.`,
+        time: new Date(lead.updatedAt).getTime(),
+        unread: !readNotificationIds.includes(`status-${lead.id}`) && (now - new Date(lead.updatedAt).getTime() < 12 * 60 * 60 * 1000)
+      }));
+
+    const getRelativeTime = (time: number) => {
+      const diffInSeconds = Math.floor((now - time) / 1000);
+      if (diffInSeconds < 60) return `${diffInSeconds}s ago`;
+      const diffInMinutes = Math.floor(diffInSeconds / 60);
+      if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+      const diffInHours = Math.floor(diffInMinutes / 60);
+      if (diffInHours < 24) return `${diffInHours}h ago`;
+      const diffInDays = Math.floor(diffInHours / 24);
+      return `${diffInDays}d ago`;
+    };
+
+    return [...newLeads, ...statusUpdates]
+      .sort((a, b) => b.time - a.time)
+      .slice(0, 5)
+      .map(n => ({
+        ...n,
+        timeStr: getRelativeTime(n.time)
+      }));
+  }, [leads, readNotificationIds]);
+
+  const unreadCount = derivedNotifications.filter(n => n.unread).length;
+
+  const markAllAsRead = () => {
+    setReadNotificationIds(prev => {
+      const newIds = derivedNotifications.map(n => n.id).filter(id => !prev.includes(id));
+      return [...prev, ...newIds];
+    });
+  };
 
   const openCreate = () => {
     setEditingLead(null);
@@ -215,7 +274,7 @@ export function LeadDashboard() {
   return (
     <main className={`app-shell ${isSidebarCollapsed ? "collapsed" : ""}`}>
       <aside className="sidebar">
-        <div className="brand-mark" style={{ justifyContent: 'space-between', width: '100%', marginBottom: '24px' }}>
+        <div className="brand-mark" style={{ justifyContent: isSidebarCollapsed ? 'center' : 'space-between', width: '100%', marginBottom: '24px' }}>
           <span style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink)' }}>LeadFlow</span>
           <button 
             className="icon-button" 
@@ -239,18 +298,6 @@ export function LeadDashboard() {
               <Columns3 size={18} />
               <span>Pipeline</span>
             </button>
-            <button className="nav-item" type="button" onClick={() => showDummyToast("Calendar view")}>
-              <Calendar size={18} />
-              <span>Calendar</span>
-            </button>
-            <button className="nav-item" type="button" onClick={() => showDummyToast("Analytics dashboard")}>
-              <BarChart2 size={18} />
-              <span>Analytics</span>
-            </button>
-            <button className="nav-item" type="button" onClick={() => showDummyToast("Team management")}>
-              <Users size={18} />
-              <span>Team</span>
-            </button>
           </nav>
         </div>
 
@@ -260,10 +307,6 @@ export function LeadDashboard() {
             <button className="nav-item" type="button" onClick={() => showDummyToast("Settings")}>
               <Settings size={18} />
               <span>Settings</span>
-            </button>
-            <button className="nav-item" type="button" onClick={() => showDummyToast("Help & Support")}>
-              <HelpCircle size={18} />
-              <span>Help</span>
             </button>
             <button className="nav-item" type="button" onClick={() => showDummyToast("Logged out")}>
               <LogOut size={18} />
@@ -281,12 +324,100 @@ export function LeadDashboard() {
           </div>
 
           <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <button className="icon-button" type="button" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }} onClick={() => showDummyToast("Messages")}>
-              <Mail size={18} />
-            </button>
-            <button className="icon-button" type="button" style={{ border: '1px solid var(--border)', background: 'var(--surface)' }} onClick={() => showDummyToast("Notifications")}>
-              <Bell size={18} />
-            </button>
+            <div style={{ position: 'relative' }}>
+              <button 
+                className="icon-button" 
+                type="button" 
+                style={{ border: '1px solid var(--border)', background: 'var(--surface)', position: 'relative' }} 
+                onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)}
+                onBlur={(e) => {
+                  if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
+                    setIsNotificationMenuOpen(false);
+                  }
+                }}
+              >
+                <Bell size={18} />
+                {unreadCount > 0 && (
+                  <span style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    background: 'var(--primary)',
+                    color: 'white',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    border: '2px solid var(--background)'
+                  }}>
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {isNotificationMenuOpen && (
+                <div 
+                  tabIndex={-1}
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    right: '0',
+                    marginTop: '8px',
+                    background: 'var(--surface)',
+                    border: '1px solid var(--border)',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                    width: '320px',
+                    zIndex: 100,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden',
+                    animation: 'modalIn 150ms ease-out'
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid var(--border)' }}>
+                    <h3 style={{ margin: 0, fontSize: '14px', fontWeight: '600', color: 'var(--ink)' }}>Notifications</h3>
+                    {unreadCount > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={markAllAsRead}
+                        onMouseDown={(e) => e.preventDefault()}
+                        style={{ fontSize: '12px', color: 'var(--primary)', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0 }}
+                      >
+                        Mark all as read
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+                    {derivedNotifications.length > 0 ? derivedNotifications.map(notif => (
+                      <div 
+                        key={notif.id} 
+                        style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '12px', background: notif.unread ? 'rgba(0,0,0,0.03)' : 'transparent', cursor: 'pointer', transition: 'background 0.2s' }} 
+                        onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.05)' }} 
+                        onMouseOut={(e) => { e.currentTarget.style.background = notif.unread ? 'rgba(0,0,0,0.03)' : 'transparent' }}
+                      >
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: notif.unread ? 'var(--primary)' : 'transparent', marginTop: '6px', flexShrink: 0 }} />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4px' }}>
+                            <span style={{ fontSize: '13px', fontWeight: notif.unread ? '600' : '500', color: 'var(--ink)' }}>{notif.title}</span>
+                            <span style={{ fontSize: '11px', color: 'var(--muted)' }}>{notif.timeStr}</span>
+                          </div>
+                          <p style={{ margin: 0, fontSize: '13px', color: 'var(--muted)', lineHeight: '1.4' }}>{notif.message}</p>
+                        </div>
+                      </div>
+                    )) : (
+                      <div style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: '13px' }}>
+                        No new notifications
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '8px', cursor: 'pointer' }} onClick={() => showDummyToast("User Profile")}>
               <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 'bold' }}>JD</div>
               <div style={{ display: 'flex', flexDirection: 'column' }}>
