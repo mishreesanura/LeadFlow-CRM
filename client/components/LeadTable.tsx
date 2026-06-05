@@ -112,9 +112,21 @@ export function LeadTable({
               <td data-label="Value">{currency.format(lead.estimatedValue)}</td>
               <td data-label="Created">{formatDate(lead.createdAt)}</td>
               <td data-label="Health">
-                <div className="health-meter" aria-label={`Health score ${lead.healthScore}`}>
-                  <span style={{ width: `${lead.healthScore}%` }} />
-                  <strong>{lead.healthScore}</strong>
+                <div 
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px 10px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: 'bold',
+                    background: lead.healthScore >= 70 ? 'rgba(16, 185, 129, 0.15)' : lead.healthScore >= 40 ? 'rgba(245, 158, 11, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                    color: lead.healthScore >= 70 ? '#059669' : lead.healthScore >= 40 ? '#d97706' : '#dc2626'
+                  }}
+                  aria-label={`Health score ${lead.healthScore}`}
+                >
+                  {lead.healthScore >= 70 ? 'Good' : lead.healthScore >= 40 ? 'Fair' : 'Poor'} - {lead.healthScore}
                 </div>
               </td>
               <td data-label="Actions">

@@ -1,13 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Libre_Baskerville } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Providers } from "./providers";
 import "./globals.css";
 import { Agentation } from "agentation";
 
-const libreBaskerville = Libre_Baskerville({
-  weight: ["400", "700"],
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-libre-baskerville",
+  variable: "--font-inter",
 });
 
 export const metadata: Metadata = {
@@ -24,7 +23,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={libreBaskerville.variable}>
+    <html lang="en" className={inter.variable}>
       <body suppressHydrationWarning>
         <Providers>{children}</Providers>
         {process.env.NODE_ENV === "development" && <Agentation />}

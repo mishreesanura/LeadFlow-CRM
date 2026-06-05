@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Edit3 } from "lucide-react";
 import { currency, formatDate } from "@/lib/format";
 import type { Lead, LeadStatus } from "@/types/lead";
 import { leadStatuses } from "@/types/lead";
@@ -27,7 +27,7 @@ export function PipelineBoard({ leads, onEdit, onSelect, onStatusChange }: Pipel
     <div className="pipeline-board">
       {leadStatuses.map((status) => (
         <section
-          className="pipeline-column"
+          className={`pipeline-column status-${status.toLowerCase()}`}
           key={status}
           onDragOver={(event) => event.preventDefault()}
           onDrop={(event) => {
@@ -54,15 +54,15 @@ export function PipelineBoard({ leads, onEdit, onSelect, onStatusChange }: Pipel
               >
                 <button type="button" onClick={() => onSelect(lead)}>
                   <strong>{lead.name}</strong>
-                  <span>{lead.company}</span>
+                  <span style={{ color: 'var(--ink)', fontSize: '13px', fontWeight: '500', opacity: 0.8, display: 'block', marginTop: '4px' }}>{lead.company}</span>
                 </button>
                 <div className="pipeline-meta">
                   <span>{currency.format(lead.estimatedValue)}</span>
                   <span>{formatDate(lead.createdAt)}</span>
                 </div>
                 <div className="pipeline-actions">
-                  <button type="button" className="text-button" onClick={() => onEdit(lead)}>
-                    Edit
+                  <button type="button" className="icon-button" onClick={() => onEdit(lead)} aria-label="Edit lead" title="Edit">
+                    <Edit3 size={14} />
                   </button>
                   <select
                     value={lead.status}
