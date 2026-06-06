@@ -2,6 +2,17 @@
 
 A production-structured full-stack CRM for small businesses to capture, search, qualify, and track leads through a sales pipeline.
 
+## Screenshots
+
+![Dashboard Overview](https://res.cloudinary.com/dptgeuamd/image/upload/v1780766098/248bbe1b-405d-44c4-bd53-509e27df6321.png)
+
+![Lead Details and Activity Timeline](https://res.cloudinary.com/dptgeuamd/image/upload/v1780766161/4ec986fe-e153-496e-a999-f4e2403ac8be.png)
+
+![Kanban Pipeline View](https://res.cloudinary.com/dptgeuamd/image/upload/v1780766217/c65f8317-1ad5-4d5e-a3a1-ea4eb095d171.png)
+
+![Command Palette](https://res.cloudinary.com/dptgeuamd/image/upload/v1780766246/5a1abe02-0999-4853-82bd-1fa216f493b6.png)
+
+
 ## Tech Stack
 
 - Frontend: Next.js, React, TypeScript, TanStack Query
