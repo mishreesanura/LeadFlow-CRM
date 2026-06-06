@@ -1,6 +1,6 @@
-# Lead Management CRM
+# LeadFlow CRM
 
-A production-structured full-stack CRM for small businesses to capture, search, qualify, and track leads through a sales pipeline.
+A production-structured full-stack lead management CRM for small businesses to capture, search, qualify, and track leads through a sales pipeline.
 
 ## Screenshots
 
