@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { leadImportService } from "../services/lead.import.service.js";
 import { leadService } from "../services/lead.service.js";
 
 export const leadController = {
@@ -40,5 +41,15 @@ export const leadController = {
   async stats(_req: Request, res: Response) {
     const data = await leadService.getStats();
     res.json({ data });
+  },
+
+  async importPreview(req: Request, res: Response) {
+    const data = await leadImportService.preview(req.body);
+    res.json({ data });
+  },
+
+  async importCommit(req: Request, res: Response) {
+    const data = await leadImportService.commit(req.body);
+    res.status(201).json({ data });
   }
 };

@@ -41,6 +41,26 @@ function serializeLead(document: { toObject: () => unknown }) {
   return document.toObject() as SerializedLead;
 }
 
+function roundPercent(part: number, total: number) {
+  return total ? Math.round((part / total) * 1000) / 10 : 0;
+}
+
+function getStatsTrendMonths() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+  return Array.from({ length: 6 }, (_, index) => {
+    const date = new Date(start.getFullYear(), start.getMonth() + index, 1);
+    const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+
+    return {
+      date,
+      month,
+      label: date.toLocaleString("en-US", { month: "short" })
+    };
+  });
+}
+
 export const leadRepository = {
   async create(payload: Partial<LeadDocument>) {
     const lead = await LeadModel.create(payload);
@@ -70,6 +90,12 @@ export const leadRepository = {
     return lead ? serializeLead(lead) : null;
   },
 
+  async findExistingEmails(emails: string[]) {
+    if (!emails.length) return new Set<string>();
+    const documents = await LeadModel.find({ email: { $in: emails } }).select("email");
+    return new Set(documents.map((document) => document.email.toLowerCase()));
+  },
+
   findDocumentById(id: string) {
     return LeadModel.findById(id);
   },
@@ -82,8 +108,10 @@ export const leadRepository = {
     const startOfMonth = new Date();
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
+    const trendMonths = getStatsTrendMonths();
+    const trendStart = trendMonths[0].date;
 
-    const [total, statusCounts, newThisMonth, pipelineValueAgg, recentDocuments] = await Promise.all([
+    const [total, statusCounts, newThisMonth, pipelineValueAgg, recentDocuments, trendBaseAgg, trendAgg] = await Promise.all([
       LeadModel.countDocuments(),
       LeadModel.aggregate<{ _id: LeadStatus; count: number }>([
         { $group: { _id: "$status", count: { $sum: 1 } } }
@@ -93,7 +121,37 @@ export const leadRepository = {
         { $match: { status: { $nin: ["Lost"] } } },
         { $group: { _id: null, value: { $sum: "$estimatedValue" } } }
       ]),
-      LeadModel.find().sort({ createdAt: -1 }).limit(5)
+      LeadModel.find().sort({ createdAt: -1 }).limit(5),
+      LeadModel.aggregate<{ _id: null; total: number; converted: number; qualified: number }>([
+        { $match: { createdAt: { $lt: trendStart } } },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            converted: { $sum: { $cond: [{ $eq: ["$status", "Converted"] }, 1, 0] } },
+            qualified: { $sum: { $cond: [{ $in: ["$status", ["Qualified", "Converted"]] }, 1, 0] } }
+          }
+        }
+      ]),
+      LeadModel.aggregate<{
+        _id: string;
+        newLeads: number;
+        converted: number;
+        qualified: number;
+        pipelineValue: number;
+      }>([
+        { $match: { createdAt: { $gte: trendStart } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: "%Y-%m", date: "$createdAt" } },
+            newLeads: { $sum: 1 },
+            converted: { $sum: { $cond: [{ $eq: ["$status", "Converted"] }, 1, 0] } },
+            qualified: { $sum: { $cond: [{ $in: ["$status", ["Qualified", "Converted"]] }, 1, 0] } },
+            pipelineValue: { $sum: { $cond: [{ $ne: ["$status", "Lost"] }, "$estimatedValue", 0] } }
+          }
+        },
+        { $sort: { _id: 1 } }
+      ])
     ]);
 
     const counts = {
@@ -110,14 +168,37 @@ export const leadRepository = {
 
     const converted = counts.Converted;
     const qualified = counts.Qualified + counts.Converted;
+    const trendByMonth = new Map(trendAgg.map((item) => [item._id, item]));
+    const baseTrend = trendBaseAgg[0] ?? { total: 0, converted: 0, qualified: 0 };
+    let runningTotal = baseTrend.total;
+    let runningConverted = baseTrend.converted;
+    let runningQualified = baseTrend.qualified;
+    const trend = trendMonths.map(({ month, label }) => {
+      const item = trendByMonth.get(month);
+      const newLeads = item?.newLeads ?? 0;
+      runningTotal += newLeads;
+      runningConverted += item?.converted ?? 0;
+      runningQualified += item?.qualified ?? 0;
+
+      return {
+        month,
+        label,
+        total: runningTotal,
+        newLeads,
+        conversionRate: roundPercent(runningConverted, runningTotal),
+        qualificationRate: roundPercent(runningQualified, runningTotal),
+        pipelineValue: item?.pipelineValue ?? 0
+      };
+    });
 
     return {
       total,
       newThisMonth,
       statusCounts: counts,
-      conversionRate: total ? Math.round((converted / total) * 1000) / 10 : 0,
-      qualificationRate: total ? Math.round((qualified / total) * 1000) / 10 : 0,
+      conversionRate: roundPercent(converted, total),
+      qualificationRate: roundPercent(qualified, total),
       pipelineValue: pipelineValueAgg[0]?.value ?? 0,
+      trend,
       recentLeads: recentDocuments.map(serializeLead)
     };
   }

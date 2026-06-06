@@ -1,4 +1,13 @@
-import type { Activity, Lead, LeadInput, LeadListResponse, LeadQuery, LeadStats } from "@/types/lead";
+import type {
+  Activity,
+  Lead,
+  LeadImportCommitResult,
+  LeadImportPreview,
+  LeadInput,
+  LeadListResponse,
+  LeadQuery,
+  LeadStats
+} from "@/types/lead";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5001/api";
 
@@ -82,4 +91,18 @@ export function deleteLead(id: string) {
   return request<{ id: string; deleted: boolean }>(`/leads/${id}`, {
     method: "DELETE"
   });
+}
+
+export function previewLeadImport(csv: string) {
+  return request<{ data: LeadImportPreview }>("/leads/import/preview", {
+    method: "POST",
+    body: JSON.stringify({ csv })
+  }).then((response) => response.data);
+}
+
+export function commitLeadImport(csv: string) {
+  return request<{ data: LeadImportCommitResult }>("/leads/import/commit", {
+    method: "POST",
+    body: JSON.stringify({ csv })
+  }).then((response) => response.data);
 }

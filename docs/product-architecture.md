@@ -117,8 +117,8 @@ Adopted patterns: fast command/search, inline updates, stage-focused pipeline, t
 
 ### Typography
 
-- Headings: Manrope
-- Body: Inter
+- Headings: Cabinet Grotesk
+- Body: Cabinet Grotesk
 - Scale: 12, 13, 14, 16, 20, 24, 32
 
 ### Components

@@ -6,6 +6,8 @@ export const leadRouter = Router();
 
 leadRouter.get("/stats", asyncHandler(leadController.stats));
 leadRouter.get("/search", asyncHandler(leadController.search));
+leadRouter.post("/import/preview", asyncHandler(leadController.importPreview));
+leadRouter.post("/import/commit", asyncHandler(leadController.importCommit));
 leadRouter.get("/", asyncHandler(leadController.list));
 leadRouter.post("/", asyncHandler(leadController.create));
 leadRouter.get("/:id/activity", asyncHandler(leadController.activity));

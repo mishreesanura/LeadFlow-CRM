@@ -2,8 +2,7 @@
 
 import { ArrowDown, ArrowUp, Edit3, Trash2 } from "lucide-react";
 import { currency, formatDate } from "@/lib/format";
-import type { Lead, LeadQuery, LeadStatus } from "@/types/lead";
-import { leadStatuses } from "@/types/lead";
+import type { Lead, LeadQuery } from "@/types/lead";
 
 type LeadTableProps = {
   leads: Lead[];
@@ -14,7 +13,6 @@ type LeadTableProps = {
   onEdit: (lead: Lead) => void;
   onDelete: (lead: Lead) => void;
   onSelect: (lead: Lead) => void;
-  onStatusChange: (lead: Lead, status: LeadStatus) => void;
 };
 
 const columns: Array<{ key: LeadQuery["sortBy"]; label: string }> = [
@@ -33,8 +31,7 @@ export function LeadTable({
   onSort,
   onEdit,
   onDelete,
-  onSelect,
-  onStatusChange
+  onSelect
 }: LeadTableProps) {
   if (isLoading) {
     return (
@@ -96,18 +93,7 @@ export function LeadTable({
                 </div>
               </td>
               <td data-label="Status">
-                <select
-                  className={`status-select status-${lead.status.toLowerCase()}`}
-                  value={lead.status}
-                  onChange={(event) => onStatusChange(lead, event.target.value as LeadStatus)}
-                  aria-label={`Change status for ${lead.name}`}
-                >
-                  {leadStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
+                <span className={`badge status-${lead.status.toLowerCase()}`}>{lead.status}</span>
               </td>
               <td data-label="Value">{currency.format(lead.estimatedValue)}</td>
               <td data-label="Created">{formatDate(lead.createdAt)}</td>

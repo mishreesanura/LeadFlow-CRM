@@ -5,10 +5,39 @@ import { leadStatuses } from "../utils/leadHealth.js";
 const trimmedString = (label: string, max = 160) =>
   z.string({ required_error: `${label} is required.` }).trim().min(1, `${label} is required.`).max(max);
 
+function parseDateInput(value: unknown) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value !== "string") return null;
+
+  const input = value.trim();
+  if (!input) return undefined;
+
+  const isoDate = input.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (isoDate) {
+    const [, year, month, day] = isoDate;
+    const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+    return date.getUTCFullYear() === Number(year) && date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day)
+      ? date
+      : null;
+  }
+
+  const spreadsheetDate = input.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+  if (spreadsheetDate) {
+    const [, day, month, rawYear] = spreadsheetDate;
+    const year = rawYear.length === 2 ? 2000 + Number(rawYear) : Number(rawYear);
+    const date = new Date(Date.UTC(year, Number(month) - 1, Number(day)));
+    return date.getUTCFullYear() === year && date.getUTCMonth() === Number(month) - 1 && date.getUTCDate() === Number(day)
+      ? date
+      : null;
+  }
+
+  const date = new Date(input);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
 const dateInput = z
-  .union([z.string().datetime(), z.string().date(), z.date()])
-  .optional()
-  .transform((value) => (value ? new Date(value) : undefined));
+  .preprocess(parseDateInput, z.date({ invalid_type_error: "Enter a valid date." }).optional());
 
 export const createLeadSchema = z.object({
   name: trimmedString("Name", 120),

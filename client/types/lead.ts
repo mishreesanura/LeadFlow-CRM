@@ -63,7 +63,57 @@ export type LeadStats = {
   conversionRate: number;
   qualificationRate: number;
   pipelineValue: number;
+  trend: LeadStatsTrendPoint[];
   recentLeads: Lead[];
+};
+
+export type LeadStatsTrendPoint = {
+  month: string;
+  label: string;
+  total: number;
+  newLeads: number;
+  conversionRate: number;
+  qualificationRate: number;
+  pipelineValue: number;
+};
+
+export type LeadImportIssue = {
+  line: number;
+  field: string;
+  severity: "error" | "warning";
+  message: string;
+  value?: string;
+};
+
+export type LeadImportPreviewRow = {
+  line: number;
+  name?: string;
+  email?: string;
+  company?: string;
+  status?: string;
+  priority?: string;
+  estimatedValue?: number;
+  issues: LeadImportIssue[];
+  data?: Partial<LeadInput>;
+};
+
+export type LeadImportPreview = {
+  rowsScanned: number;
+  rowsLoaded: number;
+  rowsWithIssues: number;
+  warnings: number;
+  errors: number;
+  canImport: boolean;
+  issues: LeadImportIssue[];
+  rows: LeadImportPreviewRow[];
+};
+
+export type LeadImportCommitResult = {
+  inserted: number;
+  rowsLoaded: number;
+  rowsWithIssues: number;
+  warnings: number;
+  errors: number;
 };
 
 export type Activity = {

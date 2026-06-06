@@ -1,6 +1,40 @@
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
 import { LeadModel } from "./models/lead.model.js";
 
+const now = new Date();
+
+function seedDate(monthsAgo: number, day: number, hour = 10) {
+  const date = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1, hour, 0, 0, 0);
+  const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+  date.setDate(Math.min(day, daysInMonth));
+
+  return monthsAgo === 0 && date > now ? new Date(now) : date;
+}
+
+function addDays(date: Date, days: number, hour = 15) {
+  const next = new Date(date.getFullYear(), date.getMonth(), date.getDate() + days, hour, 0, 0, 0);
+  return next > now ? new Date(now) : next;
+}
+
+const leadTimelines = [
+  { createdAt: seedDate(0, 3), lastContactedAt: addDays(seedDate(0, 3), 1) },
+  { createdAt: seedDate(3, 7), lastContactedAt: addDays(seedDate(3, 7), 5) },
+  { createdAt: seedDate(4, 11) },
+  { createdAt: seedDate(2, 6), lastContactedAt: addDays(seedDate(2, 6), 10) },
+  { createdAt: seedDate(5, 9) },
+  { createdAt: seedDate(2, 18) },
+  { createdAt: seedDate(1, 8), lastContactedAt: addDays(seedDate(1, 8), 4) },
+  { createdAt: seedDate(1, 17), lastContactedAt: addDays(seedDate(1, 17), 3) },
+  { createdAt: seedDate(4, 22), lastContactedAt: addDays(seedDate(4, 22), 12) },
+  { createdAt: seedDate(1, 24) },
+  { createdAt: seedDate(3, 16), lastContactedAt: addDays(seedDate(3, 16), 8) },
+  { createdAt: seedDate(4, 5), lastContactedAt: addDays(seedDate(4, 5), 6) },
+  { createdAt: seedDate(3, 24) },
+  { createdAt: seedDate(5, 19), lastContactedAt: addDays(seedDate(5, 19), 9) },
+  { createdAt: seedDate(0, 5) },
+  { createdAt: seedDate(2, 26), lastContactedAt: addDays(seedDate(2, 26), 4) }
+];
+
 const sampleLeads = [
   {
     name: "Arjun Reddy",
@@ -194,10 +228,17 @@ async function seed() {
   await connectDatabase();
   await LeadModel.deleteMany({});
   await LeadModel.insertMany(
-    sampleLeads.map((lead) => ({
-      ...lead,
-      statusHistory: [{ status: lead.status, changedAt: new Date(), note: "Seed data" }]
-    }))
+    sampleLeads.map((lead, index) => {
+      const timeline = leadTimelines[index];
+      const updatedAt = timeline.lastContactedAt ?? addDays(timeline.createdAt, 2);
+
+      return {
+        ...lead,
+        ...timeline,
+        updatedAt,
+        statusHistory: [{ status: lead.status, changedAt: updatedAt, note: "Seed data" }]
+      };
+    })
   );
   await disconnectDatabase();
   console.log("Seeded leads.");

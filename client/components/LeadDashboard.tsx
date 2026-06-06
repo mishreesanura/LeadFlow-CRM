@@ -2,30 +2,27 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  BarChart2,
   Bell,
-  Calendar,
+  BriefcaseBusiness,
   Columns3,
-  Filter,
-  HelpCircle,
-  LayoutDashboard,
   ListFilter,
-  LogOut,
-  Mail,
+  Moon,
   Plus,
   RefreshCcw,
   Search,
   Settings,
+  ShieldCheck,
   SlidersHorizontal,
-  Users,
+  Sun,
   ChevronLeft,
   ChevronRight,
   ChevronDown
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CommandPalette, type Command } from "@/components/CommandPalette";
 import { LeadDetailDrawer } from "@/components/LeadDetailDrawer";
 import { LeadForm } from "@/components/LeadForm";
+import { LeadImportModal } from "@/components/LeadImportModal";
 import { LeadTable } from "@/components/LeadTable";
 import { PipelineBoard } from "@/components/PipelineBoard";
 import { StatsPanel } from "@/components/StatsPanel";
@@ -35,38 +32,144 @@ import type { Lead, LeadInput, LeadQuery, LeadStatus } from "@/types/lead";
 import { leadStatuses } from "@/types/lead";
 
 type ViewMode = "table" | "pipeline";
+type UndoAction = {
+  message: string;
+  run: () => Promise<void>;
+};
 
 const initialQuery: LeadQuery = {
   page: 1,
-  limit: 8,
+  limit: 25,
   sortBy: "createdAt",
   sortOrder: "desc"
 };
 
+function getPaginationItems(currentPage: number, totalPages: number) {
+  if (totalPages <= 5) {
+    return Array.from({ length: totalPages }, (_, index) => index + 1);
+  }
+
+  const items: Array<number | "ellipsis-start" | "ellipsis-end"> = [1];
+  const start = Math.max(2, currentPage - 1);
+  const end = Math.min(totalPages - 1, currentPage + 1);
+
+  if (start > 2) items.push("ellipsis-start");
+  for (let page = start; page <= end; page += 1) items.push(page);
+  if (end < totalPages - 1) items.push("ellipsis-end");
+  items.push(totalPages);
+
+  return items;
+}
+
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong.";
+}
+
+function leadToInput(lead: Lead): LeadInput {
+  return {
+    name: lead.name,
+    email: lead.email,
+    phone: lead.phone,
+    company: lead.company,
+    status: lead.status,
+    notes: lead.notes,
+    source: lead.source ?? "",
+    priority: lead.priority,
+    estimatedValue: lead.estimatedValue,
+    lastContactedAt: lead.lastContactedAt
+  };
+}
+
+function isTypingTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
 }
 
 export function LeadDashboard() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState<LeadQuery>(initialQuery);
   const [searchInput, setSearchInput] = useState("");
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [viewMode, setViewMode] = useState<ViewMode>("pipeline");
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [isCommandOpen, setIsCommandOpen] = useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
   const [isNotificationMenuOpen, setIsNotificationMenuOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [isThemeResolved, setIsThemeResolved] = useState(false);
   const [readNotificationIds, setReadNotificationIds] = useState<string[]>([]);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [undoAction, setUndoAction] = useState<UndoAction | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const debouncedSearch = useDebouncedValue(searchInput, 300);
+  const isDarkMode = theme === "dark";
 
-  const showDummyToast = (action: string) => {
-    setToastMessage(`Dummy feature: ${action}`);
+  const showToast = (message: string) => {
+    setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
   };
+
+  const showDummyToast = (action: string) => {
+    showToast(`Dummy feature: ${action}`);
+  };
+
+  const closeTransientMenus = useCallback(() => {
+    setIsNotificationMenuOpen(false);
+    setIsProfileMenuOpen(false);
+    setIsStatusMenuOpen(false);
+  }, []);
+
+  const clearUndo = useCallback(() => {
+    if (undoTimerRef.current) {
+      clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setUndoAction(null);
+  }, []);
+
+  const showUndo = useCallback((action: UndoAction) => {
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoAction(action);
+    undoTimerRef.current = setTimeout(() => {
+      setUndoAction(null);
+      undoTimerRef.current = null;
+    }, 9000);
+  }, []);
+
+  const executeUndo = useCallback(async () => {
+    if (!undoAction) return;
+    const action = undoAction;
+    clearUndo();
+    await action.run();
+  }, [clearUndo, undoAction]);
+
+  useEffect(() => {
+    const currentTheme = document.documentElement.dataset.theme;
+    if (currentTheme === "dark" || currentTheme === "light") {
+      setTheme(currentTheme);
+      setIsThemeResolved(true);
+      return;
+    }
+
+    const storedTheme = window.localStorage.getItem("leadflow-theme");
+    if (storedTheme === "dark" || storedTheme === "light") {
+      setTheme(storedTheme);
+      setIsThemeResolved(true);
+      return;
+    }
+
+    setTheme(window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+    setIsThemeResolved(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isThemeResolved) return;
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("leadflow-theme", theme);
+  }, [isThemeResolved, theme]);
 
   useEffect(() => {
     setQuery((current) => ({
@@ -81,12 +184,18 @@ export function LeadDashboard() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setIsCommandOpen(true);
+        return;
+      }
+
+      if ((event.metaKey || event.ctrlKey) && !event.shiftKey && event.key.toLowerCase() === "z" && undoAction && !isTypingTarget(event.target)) {
+        event.preventDefault();
+        void executeUndo();
       }
     };
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [executeUndo, undoAction]);
 
   const leadsQuery = useQuery({
     queryKey: ["leads", query],
@@ -131,6 +240,54 @@ export function LeadDashboard() {
       setSelectedLead(null);
       setIsFormOpen(false);
       setEditingLead(null);
+      await invalidateLeadData();
+    }
+  });
+
+  const bulkStatusMutation = useMutation({
+    mutationFn: ({ targetLeads, status }: { targetLeads: Lead[]; status: LeadStatus }) => {
+      return Promise.all(
+        targetLeads.map((lead) => updateLead({ id: lead.id, payload: { status } }))
+      );
+    },
+    onSuccess: async (updatedLeads, variables) => {
+      setSelectedLead((current) => {
+        if (!current) return current;
+        return updatedLeads.find((lead) => lead.id === current.id) ?? current;
+      });
+      showUndo({
+        message: `${updatedLeads.length} leads moved to ${variables.status}.`,
+        run: async () => {
+          await Promise.all(
+            variables.targetLeads.map((lead) => updateLead({ id: lead.id, payload: { status: lead.status } }))
+          );
+          await invalidateLeadData();
+          showToast("Bulk move undone.");
+        }
+      });
+      await invalidateLeadData();
+    }
+  });
+
+  const bulkDeleteMutation = useMutation({
+    mutationFn: (targetLeads: Lead[]) => {
+      return Promise.all(targetLeads.map((lead) => deleteLead(lead.id)));
+    },
+    onSuccess: async (_deleted, targetLeads) => {
+      setSelectedLead((current) => {
+        if (!current) return current;
+        return targetLeads.some((lead) => lead.id === current.id) ? null : current;
+      });
+      setIsFormOpen(false);
+      setEditingLead(null);
+      showUndo({
+        message: `${targetLeads.length} leads deleted.`,
+        run: async () => {
+          await Promise.all(targetLeads.map((lead) => createLead(leadToInput(lead))));
+          await invalidateLeadData();
+          showToast("Deleted leads restored.");
+        }
+      });
       await invalidateLeadData();
     }
   });
@@ -196,13 +353,34 @@ export function LeadDashboard() {
   };
 
   const openCreate = () => {
+    closeTransientMenus();
+    setSelectedLead(null);
     setEditingLead(null);
+    setIsImportOpen(false);
     setIsFormOpen(true);
   };
 
   const openEdit = (lead: Lead) => {
+    closeTransientMenus();
+    setSelectedLead(null);
     setEditingLead(lead);
+    setIsImportOpen(false);
     setIsFormOpen(true);
+  };
+
+  const openImport = () => {
+    closeTransientMenus();
+    setSelectedLead(null);
+    setEditingLead(null);
+    setIsFormOpen(false);
+    setIsImportOpen(true);
+  };
+
+  const openLeadDetails = (lead: Lead) => {
+    closeTransientMenus();
+    setIsFormOpen(false);
+    setEditingLead(null);
+    setSelectedLead(lead);
   };
 
   const handleSubmitLead = (payload: LeadInput) => {
@@ -215,12 +393,52 @@ export function LeadDashboard() {
 
   const handleDeleteLead = (lead: Lead) => {
     const confirmed = window.confirm(`Delete ${lead.name}? This cannot be undone.`);
-    if (confirmed) deleteMutation.mutate(lead.id);
+    if (confirmed) {
+      deleteMutation.mutate(lead.id, {
+        onSuccess: () => {
+          showUndo({
+            message: `${lead.name} deleted.`,
+            run: async () => {
+              await createLead(leadToInput(lead));
+              await invalidateLeadData();
+              showToast("Lead restored.");
+            }
+          });
+        }
+      });
+    }
+    return confirmed;
   };
 
   const handleStatusChange = (lead: Lead, status: LeadStatus) => {
     if (lead.status === status) return;
-    updateMutation.mutate({ id: lead.id, payload: { status } });
+    updateMutation.mutate(
+      { id: lead.id, payload: { status } },
+      {
+        onSuccess: () => {
+          showUndo({
+            message: `${lead.name} moved to ${status}.`,
+            run: async () => {
+              await updateLead({ id: lead.id, payload: { status: lead.status } });
+              await invalidateLeadData();
+              showToast("Move undone.");
+            }
+          });
+        }
+      }
+    );
+  };
+
+  const handleBulkStatusChange = (targetLeads: Lead[], status: LeadStatus) => {
+    const movableLeads = targetLeads.filter((lead) => lead.status !== status);
+    if (!movableLeads.length) return;
+    bulkStatusMutation.mutate({ targetLeads: movableLeads, status });
+  };
+
+  const handleBulkDeleteLeads = (targetLeads: Lead[]) => {
+    const confirmed = window.confirm(`Delete ${targetLeads.length} selected leads? This cannot be undone.`);
+    if (confirmed) bulkDeleteMutation.mutate(targetLeads);
+    return confirmed;
   };
 
   const handleSort = (field: LeadQuery["sortBy"]) => {
@@ -245,18 +463,35 @@ export function LeadDashboard() {
     setQuery(initialQuery);
   };
 
+  const setRowsPerPage = (limit: number) => {
+    setQuery((current) => ({
+      ...current,
+      page: 1,
+      limit
+    }));
+  };
+
+  const goToPage = (page: number) => {
+    setQuery((current) => ({
+      ...current,
+      page
+    }));
+  };
+
+  const paginationItems = meta ? getPaginationItems(meta.page, meta.totalPages) : [];
+
   const commands = useMemo<Command[]>(() => {
     const leadCommands = leads.slice(0, 6).map((lead) => ({
       id: `lead-${lead.id}`,
       label: `Open ${lead.name}`,
       section: lead.company,
-      action: () => setSelectedLead(lead)
+      action: () => openLeadDetails(lead)
     }));
 
     return [
       { id: "create", label: "Create lead", section: "Lead", action: openCreate },
-      { id: "table", label: "Table view", section: "View", action: () => setViewMode("table") },
       { id: "pipeline", label: "Pipeline view", section: "View", action: () => setViewMode("pipeline") },
+      { id: "table", label: "Table view", section: "View", action: () => setViewMode("table") },
       { id: "all-status", label: "Show all statuses", section: "Filter", action: () => setStatusFilter(undefined) },
       ...leadStatuses.map((status) => ({
         id: `status-${status}`,
@@ -272,64 +507,47 @@ export function LeadDashboard() {
   const shouldShowFormError = Boolean(editingLead ? updateMutation.error : createMutation.error);
 
   return (
-    <main className={`app-shell ${isSidebarCollapsed ? "collapsed" : ""}`}>
-      <aside className="sidebar">
-        <div className="brand-mark" style={{ justifyContent: isSidebarCollapsed ? 'center' : 'space-between', width: '100%', marginBottom: '24px' }}>
-          <span style={{ fontSize: '20px', fontWeight: '800', color: 'var(--ink)' }}>LeadFlow</span>
-          <button 
-            className="icon-button" 
-            type="button" 
-            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            aria-label={isSidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            style={{ width: '32px', height: '32px' }}
-          >
-            {isSidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
-        </div>
-        
-        <div className="sidebar-section">
-          <div className="sidebar-section-title">Menu</div>
-          <nav aria-label="Workspace navigation">
-            <button className={`nav-item ${viewMode === "table" ? "active" : ""}`} type="button" onClick={() => setViewMode("table")}>
-              <LayoutDashboard size={18} />
-              <span>Dashboard</span>
-            </button>
-            <button className={`nav-item ${viewMode === "pipeline" ? "active" : ""}`} type="button" onClick={() => setViewMode("pipeline")}>
-              <Columns3 size={18} />
-              <span>Pipeline</span>
-            </button>
-          </nav>
-        </div>
-
-        <div className="sidebar-section" style={{ marginTop: 'auto' }}>
-          <div className="sidebar-section-title">General</div>
-          <nav aria-label="General navigation">
-            <button className="nav-item" type="button" onClick={() => showDummyToast("Settings")}>
-              <Settings size={18} />
-              <span>Settings</span>
-            </button>
-            <button className="nav-item" type="button" onClick={() => showDummyToast("Logged out")}>
-              <LogOut size={18} />
-              <span>Logout</span>
-            </button>
-          </nav>
-        </div>
-      </aside>
-
+    <main className="app-shell">
       <section className="workspace">
-        <header className="topbar" style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '16px' }}>
-          <div className="topbar-search" style={{ flex: 1, maxWidth: '400px', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--surface)', padding: '0 16px', height: '44px', borderRadius: '22px', border: '1px solid var(--border)', cursor: 'pointer' }} onClick={() => setIsCommandOpen(true)}>
-            <Search size={16} color="var(--muted)" />
-            <span style={{ color: 'var(--muted)', fontSize: '14px', flex: 1 }}>Search lead <kbd style={{ marginLeft: '8px', border: 'none', background: 'rgba(0,0,0,0.05)', color: 'var(--ink)' }}>⌘K</kbd></span>
+        <header className="topbar">
+          <div className="brand-mark" aria-label="LeadFlow">
+            <svg className="brand-logo" viewBox="0 0 44 44" role="img" aria-label="LeadFlow logo">
+              <path d="M10 29.5C17 18 25.5 34 34 12" />
+              <circle cx="10" cy="29.5" r="4.5" />
+              <circle cx="22" cy="23" r="4.5" />
+              <circle cx="34" cy="12" r="4.5" />
+            </svg>
+            <span className="brand-name">LeadFlow</span>
           </div>
 
-          <div className="topbar-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="topbar-actions">
+            <button
+              className="icon-button theme-toggle"
+              type="button"
+              onClick={() => {
+                setIsNotificationMenuOpen(false);
+                setIsProfileMenuOpen(false);
+                setIsStatusMenuOpen(false);
+                setTheme((current) => (current === "dark" ? "light" : "dark"));
+              }}
+              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+            >
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
+            </button>
+
             <div style={{ position: 'relative' }}>
               <button 
                 className="icon-button" 
                 type="button" 
+                aria-label="Open notifications"
+                title="Notifications"
                 style={{ border: '1px solid var(--border)', background: 'var(--surface)', position: 'relative' }} 
-                onClick={() => setIsNotificationMenuOpen(!isNotificationMenuOpen)}
+                onClick={() => {
+                  setIsProfileMenuOpen(false);
+                  setIsStatusMenuOpen(false);
+                  setIsNotificationMenuOpen((current) => !current);
+                }}
                 onBlur={(e) => {
                   if (!e.currentTarget.parentElement?.contains(e.relatedTarget as Node)) {
                     setIsNotificationMenuOpen(false);
@@ -343,7 +561,7 @@ export function LeadDashboard() {
                     top: '-4px',
                     right: '-4px',
                     background: 'var(--primary)',
-                    color: 'white',
+                    color: 'var(--primary-contrast)',
                     fontSize: '10px',
                     fontWeight: 'bold',
                     width: '16px',
@@ -367,10 +585,10 @@ export function LeadDashboard() {
                     top: '100%',
                     right: '0',
                     marginTop: '8px',
-                    background: 'var(--surface)',
+                    background: 'var(--card)',
                     border: '1px solid var(--border)',
                     borderRadius: '12px',
-                    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                    boxShadow: 'var(--popover-shadow)',
                     width: '320px',
                     zIndex: 100,
                     display: 'flex',
@@ -396,9 +614,9 @@ export function LeadDashboard() {
                     {derivedNotifications.length > 0 ? derivedNotifications.map(notif => (
                       <div 
                         key={notif.id} 
-                        style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '12px', background: notif.unread ? 'rgba(0,0,0,0.03)' : 'transparent', cursor: 'pointer', transition: 'background 0.2s' }} 
-                        onMouseOver={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.05)' }} 
-                        onMouseOut={(e) => { e.currentTarget.style.background = notif.unread ? 'rgba(0,0,0,0.03)' : 'transparent' }}
+                        style={{ padding: '16px', borderBottom: '1px solid var(--border)', display: 'flex', gap: '12px', background: notif.unread ? 'var(--menu-selected)' : 'transparent', cursor: 'pointer', transition: 'background 0.2s' }} 
+                        onMouseOver={(e) => { e.currentTarget.style.background = 'var(--menu-hover)' }} 
+                        onMouseOut={(e) => { e.currentTarget.style.background = notif.unread ? 'var(--menu-selected)' : 'transparent' }}
                       >
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: notif.unread ? 'var(--primary)' : 'transparent', marginTop: '6px', flexShrink: 0 }} />
                         <div style={{ flex: 1 }}>
@@ -418,12 +636,60 @@ export function LeadDashboard() {
                 </div>
               )}
             </div>
-            <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginLeft: '8px', cursor: 'pointer' }} onClick={() => showDummyToast("User Profile")}>
-              <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: 'var(--primary)', color: 'white', display: 'grid', placeItems: 'center', fontWeight: 'bold' }}>JD</div>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <span style={{ fontSize: '14px', fontWeight: '600', color: 'var(--ink)' }}>Jane Doe</span>
-                <span style={{ fontSize: '12px', color: 'var(--muted)' }}>jane@leadflow.com</span>
-              </div>
+            <div
+              className="profile-menu-wrap"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                  setIsProfileMenuOpen(false);
+                }
+              }}
+            >
+              <button
+                className="profile-trigger"
+                type="button"
+                aria-haspopup="menu"
+                aria-expanded={isProfileMenuOpen}
+                onClick={() => {
+                  setIsNotificationMenuOpen(false);
+                  setIsStatusMenuOpen(false);
+                  setIsProfileMenuOpen((current) => !current);
+                }}
+              >
+                <span className="profile-avatar" aria-hidden="true">JD</span>
+                <span className="profile-trigger-copy">
+                  <strong>Jane Doe</strong>
+                  <small>jane@leadflow.com</small>
+                </span>
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+
+              {isProfileMenuOpen ? (
+                <aside className="profile-card" role="menu" aria-label="Profile menu">
+                  <div className="profile-card-header">
+                    <span className="profile-avatar large" aria-hidden="true">JD</span>
+                    <div>
+                      <strong>Jane Doe</strong>
+                      <small>Workspace Owner</small>
+                    </div>
+                  </div>
+
+                  <div className="profile-card-body">
+                    <div>
+                      <BriefcaseBusiness size={15} />
+                      <span>LeadFlow CRM</span>
+                    </div>
+                    <div>
+                      <ShieldCheck size={15} />
+                      <span>Admin access</span>
+                    </div>
+                  </div>
+
+                  <button type="button" role="menuitem" onClick={() => showDummyToast("Profile settings")}>
+                    <Settings size={15} />
+                    Profile settings
+                  </button>
+                </aside>
+              ) : null}
             </div>
           </div>
         </header>
@@ -437,7 +703,7 @@ export function LeadDashboard() {
               <Plus size={16} />
               Add Lead
             </button>
-            <button className="button secondary" type="button" onClick={() => showDummyToast("Importing data...")}>
+            <button className="button secondary" type="button" onClick={openImport}>
               Import Data
             </button>
           </div>
@@ -461,7 +727,11 @@ export function LeadDashboard() {
             <button
               type="button"
               className="status-dropdown"
-              onClick={() => setIsStatusMenuOpen(!isStatusMenuOpen)}
+              onClick={() => {
+                setIsNotificationMenuOpen(false);
+                setIsProfileMenuOpen(false);
+                setIsStatusMenuOpen((current) => !current);
+              }}
               onBlur={() => setTimeout(() => setIsStatusMenuOpen(false), 150)}
               style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px', padding: '6px 12px 6px 16px', minWidth: '130px', backgroundImage: 'none' }}
             >
@@ -475,10 +745,10 @@ export function LeadDashboard() {
                 top: '100%',
                 left: '50px',
                 marginTop: '8px',
-                background: 'var(--surface)',
+                background: 'var(--card)',
                 border: '1px solid var(--border)',
                 borderRadius: '12px',
-                boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+                boxShadow: 'var(--popover-shadow)',
                 padding: '6px',
                 zIndex: 100,
                 minWidth: '160px',
@@ -489,10 +759,10 @@ export function LeadDashboard() {
               }}>
                 <button 
                   type="button"
-                  style={{ textAlign: 'left', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', background: !query.status ? 'rgba(0,0,0,0.04)' : 'transparent', color: !query.status ? 'var(--ink)' : 'var(--muted)', fontWeight: !query.status ? '600' : '400', border: 'none', cursor: 'pointer', transition: 'background 0.2s' }}
+                  style={{ textAlign: 'left', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', background: !query.status ? 'var(--menu-selected)' : 'transparent', color: !query.status ? 'var(--ink)' : 'var(--muted)', fontWeight: !query.status ? '600' : '400', border: 'none', cursor: 'pointer', transition: 'background 0.2s' }}
                   onClick={() => { setStatusFilter(undefined); setIsStatusMenuOpen(false); }}
-                  onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                  onMouseOut={(e) => e.currentTarget.style.background = !query.status ? 'rgba(0,0,0,0.04)' : 'transparent'}
+                  onMouseOver={(e) => e.currentTarget.style.background = 'var(--menu-hover)'}
+                  onMouseOut={(e) => e.currentTarget.style.background = !query.status ? 'var(--menu-selected)' : 'transparent'}
                 >
                   All Statuses
                 </button>
@@ -500,10 +770,10 @@ export function LeadDashboard() {
                   <button 
                     key={status}
                     type="button"
-                    style={{ textAlign: 'left', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', background: query.status === status ? 'rgba(0,0,0,0.04)' : 'transparent', color: query.status === status ? 'var(--ink)' : 'var(--muted)', fontWeight: query.status === status ? '600' : '400', border: 'none', cursor: 'pointer', transition: 'background 0.2s' }}
+                    style={{ textAlign: 'left', padding: '8px 12px', fontSize: '13px', borderRadius: '8px', background: query.status === status ? 'var(--menu-selected)' : 'transparent', color: query.status === status ? 'var(--ink)' : 'var(--muted)', fontWeight: query.status === status ? '600' : '400', border: 'none', cursor: 'pointer', transition: 'background 0.2s' }}
                     onClick={() => { setStatusFilter(status); setIsStatusMenuOpen(false); }}
-                    onMouseOver={(e) => e.currentTarget.style.background = 'rgba(0,0,0,0.04)'}
-                    onMouseOut={(e) => e.currentTarget.style.background = query.status === status ? 'rgba(0,0,0,0.04)' : 'transparent'}
+                    onMouseOver={(e) => e.currentTarget.style.background = 'var(--menu-hover)'}
+                    onMouseOut={(e) => e.currentTarget.style.background = query.status === status ? 'var(--menu-selected)' : 'transparent'}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className={`status-dot status-${status.toLowerCase()}`} />
@@ -516,15 +786,15 @@ export function LeadDashboard() {
           </div>
 
           <div className="segmented" role="group" aria-label="View mode">
-            <button className={viewMode === "table" ? "active" : ""} type="button" onClick={() => setViewMode("table")}>
-              <ListFilter size={16} /> Table
-            </button>
             <button
               className={viewMode === "pipeline" ? "active" : ""}
               type="button"
               onClick={() => setViewMode("pipeline")}
             >
               <Columns3 size={16} /> Pipeline
+            </button>
+            <button className={viewMode === "table" ? "active" : ""} type="button" onClick={() => setViewMode("table")}>
+              <ListFilter size={16} /> Table
             </button>
           </div>
 
@@ -550,40 +820,79 @@ export function LeadDashboard() {
             onSort={handleSort}
             onEdit={openEdit}
             onDelete={handleDeleteLead}
-            onSelect={setSelectedLead}
-            onStatusChange={handleStatusChange}
+            onSelect={openLeadDetails}
           />
         ) : (
           <PipelineBoard
             leads={leads}
             onEdit={openEdit}
-            onSelect={setSelectedLead}
+            onDelete={handleDeleteLead}
+            onSelect={openLeadDetails}
             onStatusChange={handleStatusChange}
+            onBulkStatusChange={handleBulkStatusChange}
+            onBulkDelete={handleBulkDeleteLeads}
+            isBulkActionPending={updateMutation.isPending || deleteMutation.isPending || bulkStatusMutation.isPending || bulkDeleteMutation.isPending}
           />
         )}
 
         <footer className="pagination-bar">
-          <span>
-            {meta ? `${meta.total} leads · Page ${meta.page} of ${meta.totalPages}` : "Loading leads"}
-          </span>
-          <div>
+          <div className="pagination-info">
+            <span>{meta ? `${meta.total} leads` : "Loading leads"}</span>
+            <label className="rows-per-page">
+              <span>Rows per page</span>
+              <select
+                value={query.limit}
+                onChange={(event) => setRowsPerPage(Number(event.target.value))}
+                aria-label="Rows per page"
+              >
+                {[10, 25, 50].map((value) => (
+                  <option key={value} value={value}>
+                    {value}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          <nav className="pagination-pages" aria-label="Lead pagination">
             <button
-              className="button secondary"
+              className="pagination-nav"
               type="button"
               disabled={!meta || meta.page <= 1}
-              onClick={() => setQuery((current) => ({ ...current, page: Math.max(1, current.page - 1) }))}
+              onClick={() => meta && goToPage(Math.max(1, meta.page - 1))}
             >
+              <ChevronLeft size={18} />
               Previous
             </button>
+
+            {paginationItems.map((item) =>
+              typeof item === "number" ? (
+                <button
+                  className={`page-number ${meta?.page === item ? "active" : ""}`}
+                  type="button"
+                  key={item}
+                  aria-current={meta?.page === item ? "page" : undefined}
+                  onClick={() => goToPage(item)}
+                >
+                  {item}
+                </button>
+              ) : (
+                <span className="page-ellipsis" key={item} aria-hidden="true">
+                  ...
+                </span>
+              )
+            )}
+
             <button
-              className="button secondary"
+              className="pagination-nav"
               type="button"
               disabled={!meta || meta.page >= meta.totalPages}
-              onClick={() => setQuery((current) => ({ ...current, page: current.page + 1 }))}
+              onClick={() => meta && goToPage(Math.min(meta.totalPages, meta.page + 1))}
             >
               Next
+              <ChevronRight size={18} />
             </button>
-          </div>
+          </nav>
         </footer>
       </section>
 
@@ -617,23 +926,29 @@ export function LeadDashboard() {
         </div>
       ) : null}
 
+      {isImportOpen ? (
+        <LeadImportModal
+          onClose={() => setIsImportOpen(false)}
+          onImported={invalidateLeadData}
+        />
+      ) : null}
+
       <CommandPalette isOpen={isCommandOpen} commands={commands} onClose={() => setIsCommandOpen(false)} />
 
-      {deleteMutation.isPending || updateMutation.isPending ? <div className="toast">Updating lead...</div> : null}
+      {deleteMutation.isPending || updateMutation.isPending || bulkStatusMutation.isPending || bulkDeleteMutation.isPending ? <div className="toast">Updating lead...</div> : null}
+
+      {undoAction ? (
+        <div className="toast undo-toast">
+          <span>{undoAction.message}</span>
+          <button type="button" onClick={() => void executeUndo()}>
+            Undo
+          </button>
+          <small>Ctrl/Cmd+Z</small>
+        </div>
+      ) : null}
       
       {toastMessage ? (
-        <div className="toast" style={{
-          position: 'fixed',
-          bottom: '24px',
-          right: '24px',
-          background: 'var(--ink)',
-          color: 'white',
-          padding: '12px 24px',
-          borderRadius: '12px',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-          zIndex: 100,
-          animation: 'modalIn 200ms ease-out'
-        }}>
+        <div className="toast">
           {toastMessage}
         </div>
       ) : null}
