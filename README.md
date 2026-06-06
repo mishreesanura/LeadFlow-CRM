@@ -43,11 +43,11 @@ npm install
 2. Configure environment files:
 
 ```bash
-cp server/.env.example server/.env
+cp .env.example .env
 cp client/.env.example client/.env.local
 ```
 
-3. Set `server/.env`:
+3. Set root `.env`:
 
 ```bash
 PORT=5001

@@ -80,7 +80,7 @@ npm install --cache .npm-cache
 Create environment files:
 
 ```bash
-cp server/.env.example server/.env
+cp .env.example .env
 cp client/.env.example client/.env.local
 ```
 
@@ -194,4 +194,3 @@ Deploy with:
 - Frontend: Vercel
 - Backend: Render, Railway, Fly.io, or an AWS container service
 - Database: MongoDB Atlas
-
