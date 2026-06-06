@@ -1,7 +1,7 @@
 "use client";
 
 import { Info } from "lucide-react";
-import { useId, useState } from "react";
+import { useId } from "react";
 import { compactNumber, currency } from "@/lib/format";
 import type { LeadStats, LeadStatsTrendPoint } from "@/types/lead";
 
@@ -114,7 +114,6 @@ function SparkChart({ points, type }: { points: SparkPoint[]; type: SparkType })
 }
 
 export function StatsPanel({ stats, isLoading }: StatsPanelProps) {
-  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const trend = stats?.trend?.length ? stats.trend : emptyTrend;
   const latestTrend = trend[trend.length - 1] ?? emptyTrend[emptyTrend.length - 1];
   const firstTrend = trend[0] ?? emptyTrend[0];
@@ -191,11 +190,10 @@ export function StatsPanel({ stats, isLoading }: StatsPanelProps) {
       {cards.map((card, index) => {
         const isPrimary = index === 0;
         const tooltipId = `stat-tooltip-${card.key}`;
-        const isTooltipOpen = activeTooltip === card.key;
 
         return (
           <article
-            className={`stat-card stat-${card.key} ${isPrimary ? "primary" : ""} ${isTooltipOpen ? "tooltip-open" : ""}`}
+            className={`stat-card stat-${card.key} ${isPrimary ? "primary" : ""}`}
             key={card.label}
             aria-busy={isLoading}
           >
@@ -203,17 +201,14 @@ export function StatsPanel({ stats, isLoading }: StatsPanelProps) {
               <div className="stat-card-header">
                 <p>{card.label}</p>
                 <div className="stat-hint">
-                  <button
-                    className="stat-hint-button"
-                    type="button"
+                  <span
+                    className="stat-hint-icon"
                     aria-label={`How ${card.label} is calculated`}
                     aria-describedby={tooltipId}
-                    aria-expanded={isTooltipOpen}
-                    onClick={() => setActiveTooltip((current) => (current === card.key ? null : card.key))}
                   >
                     <Info size={16} />
-                  </button>
-                  <div className={`stat-tooltip ${isTooltipOpen ? "open" : ""}`} id={tooltipId} role="tooltip">
+                  </span>
+                  <div className="stat-tooltip" id={tooltipId} role="tooltip">
                     <strong>Calculation</strong>
                     <dl>
                       {card.tooltipRows.map((row) => (

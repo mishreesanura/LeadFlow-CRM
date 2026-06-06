@@ -536,12 +536,11 @@ kbd {
 }
 
 .stat-card:hover {
-  z-index: 3;
+  z-index: 6;
   transform: translateY(-2px);
   box-shadow: var(--shadow-hover);
 }
 
-.stat-card.tooltip-open,
 .stat-card:focus-within {
   z-index: 6;
 }
@@ -687,7 +686,7 @@ path.stat-spark-line {
   z-index: 4;
 }
 
-.stat-hint-button {
+.stat-hint-icon {
   display: grid;
   place-items: center;
   width: 26px;
@@ -697,16 +696,15 @@ path.stat-spark-line {
   background: transparent;
   color: var(--muted);
   transition: background var(--fast), border-color var(--fast), color var(--fast), box-shadow var(--fast);
+  cursor: help;
 }
 
-.stat-hint-button svg {
+.stat-hint-icon svg {
   width: 14px;
   height: 14px;
 }
 
-.stat-hint-button:hover,
-.stat-hint-button:focus-visible,
-.stat-hint-button[aria-expanded="true"] {
+.stat-hint-icon:hover {
   border-color: var(--primary);
   background: var(--selected-tint);
   color: var(--primary);
@@ -714,15 +712,13 @@ path.stat-spark-line {
   outline: none;
 }
 
-.stat-card.primary .stat-hint-button {
+.stat-card.primary .stat-hint-icon {
   background: transparent;
   color: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(255, 255, 255, 0.22);
 }
 
-.stat-card.primary .stat-hint-button:hover,
-.stat-card.primary .stat-hint-button:focus-visible,
-.stat-card.primary .stat-hint-button[aria-expanded="true"] {
+.stat-card.primary .stat-hint-icon:hover {
   background: rgba(255, 255, 255, 0.14);
   color: white;
   border-color: rgba(255, 255, 255, 0.42);
@@ -732,7 +728,8 @@ path.stat-spark-line {
 .stat-tooltip {
   position: absolute;
   top: calc(100% + 10px);
-  right: 0;
+  left: -10px;
+  right: auto;
   width: min(320px, 74vw);
   padding: 14px;
   border: 1px solid var(--border-solid);
@@ -787,19 +784,48 @@ path.stat-spark-line {
   content: "";
   position: absolute;
   top: -6px;
-  right: 18px;
+  left: 18px;
+  right: auto;
   width: 10px;
   height: 10px;
   background: var(--tooltip-bg);
   transform: rotate(45deg);
 }
 
-.stat-hint:hover .stat-tooltip,
-.stat-hint:focus-within .stat-tooltip,
-.stat-tooltip.open {
+.stat-hint:hover .stat-tooltip {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
+}
+
+/* 2-column layout tooltip adjustments */
+@media (min-width: 761px) and (max-width: 1080px) {
+  .stat-conversion .stat-tooltip,
+  .stat-pipeline .stat-tooltip {
+    left: auto;
+    right: -10px;
+  }
+  .stat-conversion .stat-tooltip::before,
+  .stat-pipeline .stat-tooltip::before {
+    left: auto;
+    right: 18px;
+  }
+}
+
+/* 4-column layout tooltip adjustments */
+@media (min-width: 1081px) {
+  .stat-conversion .stat-tooltip,
+  .stat-qualification .stat-tooltip,
+  .stat-pipeline .stat-tooltip {
+    left: auto;
+    right: -10px;
+  }
+  .stat-conversion .stat-tooltip::before,
+  .stat-qualification .stat-tooltip::before,
+  .stat-pipeline .stat-tooltip::before {
+    left: auto;
+    right: 18px;
+  }
 }
 
 .stat-content > strong {

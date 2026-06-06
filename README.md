@@ -116,28 +116,48 @@ Dependency audit note: `npm audit --omit=dev` currently reports a moderate PostC
 
 ## Deployment
 
-Recommended deployment:
+Recommended deployment for this repo:
 
-- Frontend: Vercel
-- Backend: Render, Railway, Fly.io, or an AWS container service
+- Frontend: Vercel project with Root Directory set to `client`
+- Backend: separate Vercel Express project with Root Directory set to `server`, or another Node host such as Render, Railway, Fly.io, or AWS
 - Database: MongoDB Atlas
 
-Frontend environment:
+Do not rely on local `.env` files in hosted deployments. Set environment variables in the hosting provider dashboard. If the Vercel frontend project uses Root Directory `client`, it does not deploy the Express API in `server`.
+
+For an all-Vercel deployment, create two Vercel projects from the same repository:
+
+1. `leadflow-client`: Root Directory `client`, Framework `Next.js`.
+2. `leadflow-api`: Root Directory `server`, Framework `Express.js`.
+
+Frontend Vercel environment:
 
 ```bash
-NEXT_PUBLIC_API_URL=https://your-api.example.com/api
+NEXT_PUBLIC_API_URL=https://your-leadflow-api.vercel.app/api
 ```
 
-Backend environment:
+After adding or changing `NEXT_PUBLIC_API_URL`, redeploy the Vercel project because public Next.js variables are baked into the client build.
+
+Backend service environment:
 
 ```bash
 NODE_ENV=production
-PORT=5001
-MONGO_URI=mongodb+srv://...
-CLIENT_ORIGIN=https://your-client.example.com
+MONGO_URI=mongodb+srv://leadflow_user:YOUR_URL_ENCODED_PASSWORD@your-cluster.xxxxx.mongodb.net/leadflow?retryWrites=true&w=majority
+CLIENT_ORIGIN=https://your-leadflow-client.vercel.app
 RATE_LIMIT_WINDOW_MS=900000
 RATE_LIMIT_MAX=300
 ```
+
+Use the full MongoDB Atlas connection string from Atlas > Connect > Drivers. Replace the username, password, cluster hostname, and database name; do not paste `mongodb+srv://...` or leave placeholders such as `<password>`. If the password contains symbols such as `@`, `/`, `?`, `#`, or `&`, URL-encode it before saving the Vercel variable.
+
+Set `PORT` only if your backend host requires a fixed value. Many platforms provide `PORT` automatically.
+
+For Vercel preview deployments, `CLIENT_ORIGIN` supports comma-separated values and wildcard subdomains:
+
+```bash
+CLIENT_ORIGIN=https://lead-flow-crm-five.vercel.app,https://*.vercel.app
+```
+
+Use the exact production client URL whenever possible. Add `https://*.vercel.app` only if you need preview deployments to call the same backend.
 
 ## Submission Notes
 
