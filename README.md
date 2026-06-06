@@ -12,6 +12,8 @@ A production-structured full-stack CRM for small businesses to capture, search, 
 
 ![Command Palette](https://res.cloudinary.com/dptgeuamd/image/upload/v1780766246/5a1abe02-0999-4853-82bd-1fa216f493b6.png)
 
+![Dark Mode](https://res.cloudinary.com/dptgeuamd/image/upload/v1780766540/3dcb37b4-1541-4bf5-9169-d6d9938482ed.png)
+
 
 ## Tech Stack
 
