@@ -169,7 +169,3 @@ CLIENT_ORIGIN=https://lead-flow-crm-five.vercel.app,https://*.vercel.app
 ```
 
 Use the exact production client URL whenever possible. Add `https://*.vercel.app` only if you need preview deployments to call the same backend.
-
-## Submission Notes
-
-This workspace is ready to push to GitHub. Create a repository, push this folder, then deploy the client and API using the environment variables above.
