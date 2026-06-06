@@ -24,13 +24,37 @@ const rateLimit = (
   (rateLimitModule as unknown as { default?: RateLimitFactory }).default ??
   (rateLimitModule as unknown as RateLimitFactory)
 );
+const allowedOrigins = env.CLIENT_ORIGIN.split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+function isOriginAllowed(origin: string) {
+  const normalizedOrigin = origin.replace(/\/$/, "");
+
+  return allowedOrigins.some((allowedOrigin) => {
+    if (allowedOrigin === "*" || allowedOrigin === normalizedOrigin) return true;
+
+    const wildcardMatch = allowedOrigin.match(/^(https?:\/\/)\*\.(.+)$/);
+    if (!wildcardMatch) return false;
+
+    const [, protocol, hostname] = wildcardMatch;
+    return normalizedOrigin.startsWith(protocol) && normalizedOrigin.endsWith(`.${hostname}`);
+  });
+}
 
 export const app = express();
 
 app.use(helmet());
 app.use(
   cors({
-    origin: env.CLIENT_ORIGIN.split(",").map((origin) => origin.trim()),
+    origin(origin, callback) {
+      if (!origin || isOriginAllowed(origin)) {
+        callback(null, true);
+        return;
+      }
+
+      callback(null, false);
+    },
     credentials: true
   })
 );
@@ -63,3 +87,4 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 export default app;
+
