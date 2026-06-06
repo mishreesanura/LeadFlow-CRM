@@ -33,7 +33,10 @@ A production-structured full-stack CRM for small businesses to capture, search, 
 - Activity timeline and status history
 - Lead health score
 - Command palette with keyboard shortcuts
-- Responsive warm editorial SaaS UI based on `Lead Management CRM Design.pdf`
+
+## USP Feature
+
+- Designed and implemented a scalable CSV import feature for bulk lead management, incorporating validation rules and pre-import verification to maintain data quality.
 
 ## Project Structure
 
