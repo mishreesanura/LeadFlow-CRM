@@ -1,13 +1,29 @@
 import cors from "cors";
+import type { RequestHandler } from "express";
 import express from "express";
-import rateLimit from "express-rate-limit";
-import helmet from "helmet";
+import * as rateLimitModule from "express-rate-limit";
+import type { Options, RateLimitRequestHandler } from "express-rate-limit";
+import * as helmetModule from "helmet";
+import type { HelmetOptions } from "helmet";
 import morgan from "morgan";
 import { connectDatabase } from "./config/database.js";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { notFoundHandler } from "./middleware/notFound.js";
 import { leadRouter } from "./routes/lead.routes.js";
+
+type HelmetFactory = (options?: Readonly<HelmetOptions>) => RequestHandler;
+type RateLimitFactory = (options?: Partial<Options>) => RateLimitRequestHandler;
+
+const helmet = (
+  (helmetModule as unknown as { default?: HelmetFactory }).default ??
+  (helmetModule as unknown as HelmetFactory)
+);
+const rateLimit = (
+  rateLimitModule.rateLimit ??
+  (rateLimitModule as unknown as { default?: RateLimitFactory }).default ??
+  (rateLimitModule as unknown as RateLimitFactory)
+);
 
 export const app = express();
 
